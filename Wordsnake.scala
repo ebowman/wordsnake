@@ -20,13 +20,14 @@ object Wordsnake extends App {
   allSeeds = null
   var best = null: String
   while (!shortSolutions.isEmpty) {
-    val intermediate = shortSolutions.take(10000).par.reduce((a, b) => if (a.length < b.length) a else b)
-    shortSolutions = shortSolutions.drop(10000)
+    val (intermediate, soln) = shortSolutions.splitAt(10000)
+    val iReduced = intermediate.par.reduce((a, b) => if (a.length < b.length) a else b)
+    shortSolutions = soln
     if (best == null) {
-      best = intermediate
+      best = iReduced
     } else {
       if (intermediate.length < best.length) {
-        best = intermediate
+        best = iReduced
         println(best + " (" + best.length + ")")
       }
     }
