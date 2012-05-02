@@ -11,8 +11,10 @@ object Main extends App {
   val start = System.currentTimeMillis
   val snake = new SnakeSolver
   val words = "subway dentist wayward highway rib terrible english blessed less warden stash shunt hunter".split("\\s+").toList
-  val redundant = (for (a <- words; b <- words if a != b) yield if (a.contains(b)) Some(b) else None).flatten.distinct
-  val reduced = words filterNot (redundant contains)
+  println("Wordsnakes for " + words.mkString("\"", "\", \"", "\""))
+  val degenerate = (for (a <- words; b <- words if a != b) yield if (a.contains(b)) Some(b) else None).flatten.distinct
+  if (!degenerate.isEmpty) println("Some degeneracies exist (%s); pruning".format(degenerate.mkString("\"", "\", \"", "\"")))
+  val reduced = words filterNot (degenerate contains)
   val result = snake.solve(reduced)
   val stop = System.currentTimeMillis
   println(result.toList.sorted.mkString("\n"))
