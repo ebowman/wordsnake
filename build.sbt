@@ -10,7 +10,7 @@ scalaVersion := "2.9.1"
 resolvers ++= Seq(
     "external" at "https://nexus.gilt.com/nexus/repositories/content/repositories/sonatype.releases")
 
-libraryDependencies ++= Seq("com.typesafe.akka" % "akka-actor" % "2.0")
+//libraryDependencies ++= Seq("com.typesafe.akka" % "akka-actor" % "2.0")
 
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-optimize")
 

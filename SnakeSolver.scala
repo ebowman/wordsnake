@@ -7,9 +7,9 @@ import java.util.Date
  * @since 5/2/12 2:47 PM
  */
 
-object Driver extends App {
+object Main extends App {
   val start = System.currentTimeMillis
-  val snake = new Wordsnake2
+  val snake = new SnakeSolver
   val words = "subway dentist wayward highway rib terrible english blessed less warden stash shunt hunter".split("\\s+").toList
   val redundant = (for (a <- words; b <- words if a != b) yield if (a.contains(b)) Some(b) else None).flatten.distinct
   val reduced = words filterNot (redundant contains)
@@ -19,29 +19,40 @@ object Driver extends App {
   println("Total time = %s".format(Format.formatMs(stop - start)))
 }
 
-final class Wordsnake2 {
+final class SnakeSolver {
   def solve(words: List[String]): Set[String] = {
     var count = 0
     val pageSize = 10000 // how many permutations to deal with in one go
+    val longestWord = words.map(_.length).max
     val permutationCount = (2l to words.size.toLong).foldLeft(1l)(_ * _)
     println("%s permutations".format(permutationCount))
     var bestSolutions = List(words.mkString)
     val permutationIterator = words.permutations
     val start = System.currentTimeMillis
     while (permutationIterator.hasNext) {
-      val nextPage = permutationIterator.take(pageSize).toSeq//.par // seems to be buggy
+      val nextPage = permutationIterator.take(pageSize).toSeq.par // seems to be buggy
       count += 1
       printProgress(count)
       val candidates = nextPage.fold(bestSolutions) {
         (previousSolutions, permutation) =>
-          val newSolution = permutation.reduce(mergeFast)
-          val bestScore = previousSolutions.head.length
-          if (newSolution.length < bestScore) {
-            List(newSolution)
-          } else if (newSolution.length == bestScore && !previousSolutions.contains(newSolution)) {
-            newSolution :: previousSolutions
+          if (permutation.find(_.length > longestWord).isEmpty) {
+            val newSolution = permutation.reduce(mergeFast)
+            val bestScore = previousSolutions.head.length
+            if (newSolution.length < bestScore) {
+              List(newSolution)
+            } else if (newSolution.length == bestScore && !previousSolutions.contains(newSolution)) {
+              newSolution :: previousSolutions
+            } else {
+              previousSolutions
+            }
           } else {
-            previousSolutions
+            if (previousSolutions.head.length < permutation.head.length) {
+              previousSolutions
+            } else if (previousSolutions.head.length == permutation.head.length) {
+              (previousSolutions ::: permutation).distinct
+            } else {
+              permutation
+            }
           }
       }
       if (candidates.head.length < bestSolutions.head.length) {
@@ -58,33 +69,11 @@ final class Wordsnake2 {
       val msPer = (tookMs + 0d) / (pageSize * count)
       val msLeft = (1d - percent) * permutationCount * msPer
       if (((pageSize * count) % 10000000) == 0) {
-        println("done: %s (%2.2f%%) (%s remaining) (%s) (ms per permutation: %2.5f)".format(
+        println("%s complete (%2.2f%%) (%s remaining) (%s) (ms per permutation: %2.5f)".format(
           pageSize * count, 100d * percent, Format.formatMs(math.round(msLeft)), new Date(now + math.round(msLeft)).toString, msPer))
       }
     }
     bestSolutions.toSet
-  }
-
-  def merge(a: String, b: String): String = {
-    val right = mergeFast(a, b)
-    val wrong = merge2(a, b)
-    if (right != wrong) {
-      merge2(a, b)
-    }
-    right
-  }
-
-  def merge2(a: String, b: String): String = {
-    if (b.contains(a)) {
-      b
-    } else {
-      for (i <- 1 until a.length) {
-        if (b.startsWith(a.drop(i))) {
-          return a.take(i) + b
-        }
-      }
-      a + b
-    }
   }
 
   def mergeFast(a: String, b: String): String = {
@@ -114,15 +103,9 @@ final class Wordsnake2 {
       }
       i += 1
     }
-    if (a.length >= b.length && a.indexOf(b, 0) > -1) {
-      a
-    } else if (b.indexOf(a, 0) > -1) {
-      b
-    } else {
-      System.arraycopy(aArr, 0, resultBuffer, 0, aArr.length)
-      System.arraycopy(bArr, 0, resultBuffer, aArr.length, bArr.length)
-      new String(resultBuffer, 0, resultBuffer.length)
-    }
+    System.arraycopy(aArr, 0, resultBuffer, 0, aArr.length)
+    System.arraycopy(bArr, 0, resultBuffer, aArr.length, bArr.length)
+    new String(resultBuffer, 0, resultBuffer.length)
   }
 }
 
