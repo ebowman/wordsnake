@@ -16,7 +16,7 @@ scalacOptions ++= Seq("-deprecation", "-unchecked", "-optimize")
 
 mainClass in (Compile, packageBin) := Some("Fast")
 
-//seq(com.twitter.sbt.GitProject.gitSettings: _*)
+seq(com.twitter.sbt.GitProject.gitSettings: _*)
 
-//seq(com.twitter.sbt.PackageDist.newSettings: _*)
+seq(com.twitter.sbt.PackageDist.newSettings: _*)
 

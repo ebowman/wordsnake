@@ -33,8 +33,7 @@ import java.util.Date
 object Main extends App {
   val start = System.currentTimeMillis
   val snake = new SnakeSolver
-  println(snake.mergeFast("rib", "terrible"))
-  println(snake.mergeFast("terrible", "rib"))
+  //val words = "hunter rib blessed terrible".split("\\s+").toList
   val words = "subway dentist wayward highway rib terrible english blessed less warden stash shunt hunter".split("\\s+").toList
   println("Wordsnakes for " + words.mkString("\"", "\", \"", "\""))
   val result = snake.solve(words)
@@ -45,7 +44,7 @@ object Main extends App {
 
 final class SnakeSolver {
   def solve(words: List[String]): Set[String] = {
-    var count = 0
+    var count = 0L
     val pageSize = 10000 // how many permutations to deal with in one go. Tuned value to take advantage of parallelism.
     val longestWord = words.map(_.length).max
     val permutationCount = (2l to words.size.toLong).foldLeft(1l)(_ * _)
@@ -53,6 +52,9 @@ final class SnakeSolver {
     var bestSolutions = List(words.mkString)
     val permutationIterator = words.permutations
     val start = System.currentTimeMillis
+    implicit val strOrdering = new Ordering[String] {
+      def compare(x: String, y: String) = x.length - y.length
+    }
     while (permutationIterator.hasNext) {
       val nextPage = permutationIterator.take(pageSize).toSeq.par
       count += 1
@@ -72,14 +74,9 @@ final class SnakeSolver {
             // previously we were doing a reduce here, but if we do a foldLeft
             // we can short-circuit if the accumulator length becomes longer
             // than the best we've seen so far
-            val newSolution = permutation.tail.foldLeft(permutation.head) {
-              case (soFar, next) =>
-                if (soFar.length > previousSolutions.head.length) {
-                  soFar
-                } else {
-                  mergeFast(soFar, next)
-                }
-            }
+            val newSolution = permutation.tail.foldLeft(Seq(permutation.head)) {
+              case (soFars, next) => soFars.flatMap(mergeFast(_, next)).distinct
+            }.min
             val bestScore = previousSolutions.head.length
             if (newSolution.length < bestScore) {
               List(newSolution)
@@ -105,7 +102,7 @@ final class SnakeSolver {
       }
     }
 
-    def printProgress(count: Int) {
+    def printProgress(count: Long) {
       if (((pageSize * count) % 10000000) == 0) {
         val now = System.currentTimeMillis
         val percent = (0d + pageSize * count) / permutationCount
@@ -130,7 +127,7 @@ final class SnakeSolver {
     a + b
   }
 
-  def mergeFast(a: String, b: String): String = {
+  def mergeFast(a: String, b: String): Seq[String] = {
     val aArr = a.toCharArray
     val bArr = b.toCharArray
     val resultBuffer = new Array[Char](a.length + b.length)
@@ -151,12 +148,12 @@ final class SnakeSolver {
           // e.g. (terrible, rib) => terriblerib
           System.arraycopy(aArr, 0, resultBuffer, 0, aArr.length)
           System.arraycopy(bArr, 0, resultBuffer, aArr.length, bArr.length)
-          new String(resultBuffer, 0, resultBuffer.length)
+          return Seq(new String(resultBuffer, 0, resultBuffer.length))
         } else {
           // e.g. (terrible, blessed) => terriblessed
           System.arraycopy(aArr, 0, resultBuffer, 0, i)
           System.arraycopy(bArr, 0, resultBuffer, i, bArr.length)
-          return new String(resultBuffer, 0, i + bArr.length)
+          return Seq(a + b, new String(resultBuffer, 0, i + bArr.length))
         }
       }
       i += 1
@@ -165,7 +162,7 @@ final class SnakeSolver {
     // e.g. (rib, terrible) => ribterrible
     System.arraycopy(aArr, 0, resultBuffer, 0, aArr.length)
     System.arraycopy(bArr, 0, resultBuffer, aArr.length, bArr.length)
-    new String(resultBuffer, 0, resultBuffer.length)
+    Seq(new String(resultBuffer, 0, resultBuffer.length))
   }
 }
 
