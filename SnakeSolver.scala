@@ -1,7 +1,30 @@
 import java.util.Date
 
 /**
- * Document Me.
+ * Brute-force solves the "wordsnake" problem. Wordsnakes are the different ways one can combine
+ * words together using as few letters as possible.  For example, "terrible" and "english" have two
+ * (ordered) wordsnakes: "terribleenglish" and "terriblenglish".  For the wordsnakes problem, we take
+ * a list of words and compute all the smallest ways to combine them.
+ *
+ * This is in essence a travelling salesman problem, which is ultimately a problem in permutations.
+ * In this program we consider all permutations of the list of words, and fold over the permutation
+ * a merge operation that finds the shortest wordsnake for each adjacent pair of words, so that we end
+ * up with the smallest wordsnake for each permutation.  When then iterate over all permutations and
+ * remember the best paths.
+ *
+ * One interesting aspect of this program from a scala point of view, is how it uses a lazy iterator over
+ * the permutations, and a fold operation (instead of foldLeft).  The fold works over a parallel collection,
+ * so we pull off some number of permutations from the iterator, and then do the parallel fold over them.
+ * It took some experimentation to find the right value for "pageSize", the number to pull of the iterator
+ * in one go.
+ *
+ * This program runs fastest without about a 500M heap, though will run fine (slightly slower) with a much
+ * smaller heap; I ran it with a 5M heap to completion (though much slower than with a bigger heap).
+ *
+ * $ scala -cp target/scala-2.9.1/classes -J-Xms5m -J-Xmx5m -J-server Main
+ *
+ * This idea was taken from _Puzzles for Programmers and Pros_ by Dennis E. Sasha, Wiley Publishing, Indianapolis,
+ * (c) pp.171-173
  *
  * @author Eric Bowman
  * @since 5/2/12 2:47 PM
@@ -24,7 +47,7 @@ object Main extends App {
 final class SnakeSolver {
   def solve(words: List[String]): Set[String] = {
     var count = 0
-    val pageSize = 10000 // how many permutations to deal with in one go
+    val pageSize = 10000 // how many permutations to deal with in one go. Tuned value to take advantage of parallelism.
     val longestWord = words.map(_.length).max
     val permutationCount = (2l to words.size.toLong).foldLeft(1l)(_ * _)
     println("%s permutations".format(permutationCount))
@@ -32,7 +55,7 @@ final class SnakeSolver {
     val permutationIterator = words.permutations
     val start = System.currentTimeMillis
     while (permutationIterator.hasNext) {
-      val nextPage = permutationIterator.take(pageSize).toSeq.par // seems to be buggy
+      val nextPage = permutationIterator.take(pageSize).toSeq.par
       count += 1
       printProgress(count)
       val candidates = nextPage.fold(bestSolutions) {
@@ -65,12 +88,12 @@ final class SnakeSolver {
     }
 
     def printProgress(count: Int) {
-      val now = System.currentTimeMillis
-      val percent = (0d + pageSize * count) / permutationCount
-      val tookMs = now - start
-      val msPer = (tookMs + 0d) / (pageSize * count)
-      val msLeft = (1d - percent) * permutationCount * msPer
       if (((pageSize * count) % 10000000) == 0) {
+        val now = System.currentTimeMillis
+        val percent = (0d + pageSize * count) / permutationCount
+        val tookMs = now - start
+        val msPer = (tookMs + 0d) / (pageSize * count)
+        val msLeft = (1d - percent) * permutationCount * msPer
         println("%s complete (%2.2f%%) (%s remaining) (%s) (ms per permutation: %2.5f)".format(
           pageSize * count, 100d * percent, Format.formatMs(math.round(msLeft)), new Date(now + math.round(msLeft)).toString, msPer))
       }
@@ -105,6 +128,13 @@ final class SnakeSolver {
       }
       i += 1
     }
+    // because we removed degeneracies in advance, we don't need to check
+    // whether b contains a here.  If we didn't remove the degeneracies,
+    // we would need a check here like:
+    //    if (b contains a) {
+    //      return b
+    //    }
+    // The algorithm above catches the a contains b case already
     System.arraycopy(aArr, 0, resultBuffer, 0, aArr.length)
     System.arraycopy(bArr, 0, resultBuffer, aArr.length, bArr.length)
     new String(resultBuffer, 0, resultBuffer.length)
