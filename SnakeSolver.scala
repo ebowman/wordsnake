@@ -33,12 +33,11 @@ import java.util.Date
 object Main extends App {
   val start = System.currentTimeMillis
   val snake = new SnakeSolver
+  println(snake.mergeFast("rib", "terrible"))
+  println(snake.mergeFast("terrible", "rib"))
   val words = "subway dentist wayward highway rib terrible english blessed less warden stash shunt hunter".split("\\s+").toList
   println("Wordsnakes for " + words.mkString("\"", "\", \"", "\""))
-  val degenerate = (for (a <- words; b <- words if a != b) yield if (a.contains(b)) Some(b) else None).flatten.distinct
-  if (!degenerate.isEmpty) println("Some degeneracies exist (%s); pruning".format(degenerate.mkString("\"", "\", \"", "\"")))
-  val reduced = words filterNot (degenerate contains)
-  val result = snake.solve(reduced)
+  val result = snake.solve(words)
   val stop = System.currentTimeMillis
   println(result.toList.sorted.mkString("\n"))
   println("Total time = %s".format(Format.formatMs(stop - start)))
@@ -60,8 +59,27 @@ final class SnakeSolver {
       printProgress(count)
       val candidates = nextPage.fold(bestSolutions) {
         (previousSolutions, permutation) =>
+        // fold is non-intuitive. If we were doing foldLeft, the previousSolutions
+        // would be the result of reducing everything to the left, and permutation
+        // would be the latest permutation.  But it could be that permutation is actually
+        // the result of having reducing something else.  We check for that by looking for
+        // a word longer than the longest known word (computed at the start), and if we
+        // find that then we know we are actually deciding between two previous reductions.
+        // How do we know that previousSolutions is never actually a non-reduced permutation?
+        // Well, because I ran it once with this:
+        // require(previousSolutions.exists(_.length > longestWord))
           if (permutation.find(_.length > longestWord).isEmpty) {
-            val newSolution = permutation.reduce(mergeFast)
+            // previously we were doing a reduce here, but if we do a foldLeft
+            // we can short-circuit if the accumulator length becomes longer
+            // than the best we've seen so far
+            val newSolution = permutation.tail.foldLeft(permutation.head) {
+              case (soFar, next) =>
+                if (soFar.length > previousSolutions.head.length) {
+                  soFar
+                } else {
+                  mergeFast(soFar, next)
+                }
+            }
             val bestScore = previousSolutions.head.length
             if (newSolution.length < bestScore) {
               List(newSolution)
@@ -101,6 +119,17 @@ final class SnakeSolver {
     bestSolutions.toSet
   }
 
+  def mergeSlow(a: String, b: String): String = {
+    var i = 1
+    while (i < a.length) {
+      if (b.startsWith(a.drop(i))) {
+        return a.take(i) + b
+      }
+      i += 1
+    }
+    a + b
+  }
+
   def mergeFast(a: String, b: String): String = {
     val aArr = a.toCharArray
     val bArr = b.toCharArray
@@ -119,8 +148,12 @@ final class SnakeSolver {
       }
       if (matches) {
         if (i + bArr.length < aArr.length) {
-          return a
+          // e.g. (terrible, rib) => terriblerib
+          System.arraycopy(aArr, 0, resultBuffer, 0, aArr.length)
+          System.arraycopy(bArr, 0, resultBuffer, aArr.length, bArr.length)
+          new String(resultBuffer, 0, resultBuffer.length)
         } else {
+          // e.g. (terrible, blessed) => terriblessed
           System.arraycopy(aArr, 0, resultBuffer, 0, i)
           System.arraycopy(bArr, 0, resultBuffer, i, bArr.length)
           return new String(resultBuffer, 0, i + bArr.length)
@@ -128,13 +161,8 @@ final class SnakeSolver {
       }
       i += 1
     }
-    // because we removed degeneracies in advance, we don't need to check
-    // whether b contains a here.  If we didn't remove the degeneracies,
-    // we would need a check here like:
-    //    if (b contains a) {
-    //      return b
-    //    }
-    // The algorithm above catches the a contains b case already
+
+    // e.g. (rib, terrible) => ribterrible
     System.arraycopy(aArr, 0, resultBuffer, 0, aArr.length)
     System.arraycopy(bArr, 0, resultBuffer, aArr.length, bArr.length)
     new String(resultBuffer, 0, resultBuffer.length)
