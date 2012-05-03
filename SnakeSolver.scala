@@ -38,7 +38,9 @@ object Main extends App {
   println("Wordsnakes for " + words.mkString("\"", "\", \"", "\""))
   val result = snake.solve(words)
   val stop = System.currentTimeMillis
-  println(result.toList.sorted.mkString("\n"))
+  println(result.map(w => (w, w.length)).toList.sorted.map(ws => "%s (%d)".format(ws._1, ws._2)).mkString("\n"))
+  val ratio = 100f * (1 - result.head.length.toFloat / words.mkString("").length)
+  println("Compression %2.1f%%".format(ratio))
   println("Total time = %s".format(Format.formatMs(stop - start)))
 }
 
@@ -103,7 +105,7 @@ final class SnakeSolver {
     }
 
     def printProgress(count: Long) {
-      if (((pageSize * count) % 10000000) == 0) {
+      if (((pageSize * count) % 1000000) == 0) {
         val now = System.currentTimeMillis
         val percent = (0d + pageSize * count) / permutationCount
         val tookMs = now - start
